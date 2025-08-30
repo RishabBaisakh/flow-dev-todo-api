@@ -1,0 +1,30 @@
+.env# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Build output
+bin/
+obj/
+
+# Logs
+*.log
+
+# Database
+*.mdf
+*.ldf
+
+# Secrets / Config
+.env
+.env.local
+appsettings.*.json
+appsettings.Development.json
+appsettings.Local.json
+
+# Others
+*.tmp
+*.cache
+*.pdb
+*.dbmdl
