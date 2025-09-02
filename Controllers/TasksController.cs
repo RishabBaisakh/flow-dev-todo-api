@@ -21,9 +21,9 @@ namespace TodoApi.Controllers
     {
       if (!Enum.TryParse<Models.TaskStatus>(dto.Status, ignoreCase: true, out var status))
       {
-          return BadRequest(new { 
-              Status = $"'{dto.Status}' is not valid. Allowed values are: ToDo, InProgress, Completed." 
-          });
+        return BadRequest(new { 
+          Status = $"'{dto.Status}' is not valid. Allowed values are: ToDo, InProgress, Completed." 
+        });
       }
       var task = new TaskItem
       {
@@ -39,10 +39,34 @@ namespace TodoApi.Controllers
     }
 
     [HttpGet]
-    public async Task<ActionResult<List<TaskItem>>> GetTasks()
+    public async Task<ActionResult<List<TaskItem>>> GetTasks(
+      [FromQuery] int pageNumber = 1, 
+      [FromQuery] int pageSize = 5)
     {
+      if (pageNumber < 1) pageNumber = 1;
+      if (pageSize < 1) pageSize = 5;
+
       var tasks = await _tasksService.GetAsync();
-      return Ok(tasks);
+      var reversedTasks = tasks.OrderByDescending(t => t.Id).ToList();
+
+      var pagedTasks = reversedTasks
+        .Skip((pageNumber - 1) * pageSize)
+        .Take(pageSize)
+        .ToList();
+
+      var totalTasks = reversedTasks.Count;
+      var totalPages = (int)Math.Ceiling(totalTasks / (double)pageSize);
+
+      var response = new
+      {
+        PageNumber = pageNumber,
+        PageSize = pageSize,
+        TotalPages = totalPages,
+        TotalTasks = totalTasks,
+        Tasks = pagedTasks
+      };
+
+      return Ok(response);
     }
 
     [HttpPatch("{id}")]
@@ -50,9 +74,9 @@ namespace TodoApi.Controllers
     {
       if (!Enum.TryParse<Models.TaskStatus>(dto.Status, ignoreCase: true, out var status))
       {
-          return BadRequest(new { 
-              Status = $"'{dto.Status}' is not valid. Allowed values are: ToDo, InProgress, Completed." 
-          });
+        return BadRequest(new { 
+          Status = $"'{dto.Status}' is not valid. Allowed values are: ToDo, InProgress, Completed." 
+        });
       }
 
       var updatedTask = await _tasksService.UpdateStatusAsync(id, status);
