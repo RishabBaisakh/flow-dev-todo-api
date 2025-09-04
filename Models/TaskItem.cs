@@ -21,7 +21,7 @@ namespace TodoApi.Models
     public TaskStatus Status { get; set; } = TaskStatus.ToDo;
 
     [Required]
-    public string AssignedUser { get; set; } = string.Empty;
-    // Change the above to a user type so it can be used to switch screens for demo purpose
+    [BsonRepresentation(BsonType.ObjectId)]
+    public string AssignedUserId { get; set; } = string.Empty;
   }
 }

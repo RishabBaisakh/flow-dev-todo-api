@@ -1,7 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using TodoApi.Models;
-using TodoApi.DTOs;
+using TodoApi.DTOs.Task;
 using TodoApi.Services;
+using TodoApi.DTOs;
 
 namespace TodoApi.Controllers
 {
@@ -10,72 +11,134 @@ namespace TodoApi.Controllers
   public class TasksController : ControllerBase
   {
     private readonly TasksService _tasksService;
+    private readonly UserService _userService;
 
-    public TasksController(TasksService tasksService)
+    public TasksController(TasksService tasksService, UserService userService)
     {
       _tasksService = tasksService;
+      _userService = userService;
     }
 
     [HttpPost]
-    public async Task<IActionResult> CreateTask(CreateTaskDto dto)
+    public async Task<IActionResult> CreateTask(CreateTaskDto createTaskDto)
     {
-      if (!Enum.TryParse<Models.TaskStatus>(dto.Status, ignoreCase: true, out var status))
+      if (!Enum.TryParse<Models.TaskStatus>(createTaskDto.Status, ignoreCase: true, out var status))
       {
-        return BadRequest(new { 
-          Status = $"'{dto.Status}' is not valid. Allowed values are: ToDo, InProgress, Completed." 
+        return BadRequest(new
+        {
+          Status = $"'{createTaskDto.Status}' is not valid. Allowed values: ToDo, InProgress, Completed."
         });
       }
+
+      var assignedUser = await _userService.GetByIdAsync(createTaskDto.AssignedUserId);
+      if (assignedUser == null)
+      {
+        return BadRequest(new { Error = "Assigned user does not exist." });
+      }
+
       var task = new TaskItem
       {
-        Title = dto.Title,
-        Description = dto.Description,
+        Title = createTaskDto.Title,
+        Description = createTaskDto.Description,
         Status = status,
-        AssignedUser = dto.AssignedUser
+        AssignedUserId = createTaskDto.AssignedUserId
       };
 
       await _tasksService.CreateAsync(task);
 
-      return CreatedAtAction(nameof(GetTasks), new { id = task.Id }, task);
+      var result = new
+      {
+        task.Id,
+        task.Title,
+        task.Description,
+        Status = task.Status.ToString(),
+        AssignedUser = new
+        {
+          assignedUser.Id,
+          assignedUser.Name,
+          assignedUser.Avatar
+        }
+      };
+
+      return CreatedAtAction(nameof(GetTaskById), new { id = task.Id }, result);
+    }
+
+
+    [HttpGet("{id:length(24)}")]
+    public async Task<IActionResult> GetTaskById(string id)
+    {
+      var task = await _tasksService.GetByIdAsync(id);
+      if (task == null) return NotFound();
+
+      var user = await _userService.GetByIdAsync(task.AssignedUserId);
+
+      var result = new
+      {
+        task.Id,
+        task.Title,
+        task.Description,
+        Status = task.Status.ToString(),
+        AssignedUser = user != null ? new
+        {
+          user.Id,
+          user.Name,
+          user.Avatar
+        } : null
+      };
+
+      return Ok(result);
     }
 
     [HttpGet]
-    public async Task<ActionResult<List<TaskItem>>> GetTasks(
-      [FromQuery] int pageNumber = 1, 
-      [FromQuery] int pageSize = 5)
+    public async Task<IActionResult> GetTasks([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 5)
     {
       if (pageNumber < 1) pageNumber = 1;
       if (pageSize < 1) pageSize = 5;
 
       var tasks = await _tasksService.GetAsync();
-      var reversedTasks = tasks.OrderByDescending(t => t.Id).ToList();
+      var sortedTasks = tasks.OrderByDescending(t => t.Id).ToList();
 
-      var pagedTasks = reversedTasks
+      var pagedTasks = sortedTasks
         .Skip((pageNumber - 1) * pageSize)
         .Take(pageSize)
         .ToList();
 
-      var totalTasks = reversedTasks.Count;
+      var userIds = pagedTasks.Select(t => t.AssignedUserId).Distinct().ToList();
+      var users = await _userService.GetByIdsAsync(userIds);
+
+      var result = pagedTasks.Select(task => new
+      {
+        task.Id,
+        task.Title,
+        task.Description,
+        Status = task.Status.ToString(),
+        AssignedUser = users
+          .Where(u => u.Id == task.AssignedUserId)
+          .Select(u => new { u.Id, u.Name, u.Avatar })
+          .FirstOrDefault()
+      });
+
+      var totalTasks = sortedTasks.Count;
       var totalPages = (int)Math.Ceiling(totalTasks / (double)pageSize);
 
-      var response = new
+      return Ok(new
       {
         PageNumber = pageNumber,
         PageSize = pageSize,
         TotalPages = totalPages,
         TotalTasks = totalTasks,
-        Tasks = pagedTasks
-      };
-
-      return Ok(response);
+        Tasks = result
+      });
     }
 
-    [HttpPatch("{id}")]
-    public async Task<IActionResult> UpdateTaskStatus(string id, [FromBody] UpdateTaskStatusDto dto)
+    [HttpPatch("{id:length(24)}/status")]
+    public async Task<IActionResult> UpdateTaskStatus(string id, [FromBody] UpdateTaskStatusDto updateStatusDto)
     {
-      if (!Enum.TryParse<Models.TaskStatus>(dto.Status, ignoreCase: true, out var status))
+      if (!Enum.TryParse<Models.TaskStatus>(updateStatusDto.Status, ignoreCase: true, out var status))
       {
-        return BadRequest(new { 
-          Status = $"'{dto.Status}' is not valid. Allowed values are: ToDo, InProgress, Completed." 
+        return BadRequest(new
+        {
+            Status = $"'{updateStatusDto.Status}' is not valid. Allowed values: ToDo, InProgress, Completed."
         });
       }
 

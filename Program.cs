@@ -13,6 +13,7 @@ builder.Configuration.GetSection("MongoDbSettings"));
 
 // Services
 builder.Services.AddSingleton<TasksService>();
+builder.Services.AddSingleton<UserService>();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

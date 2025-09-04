@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using TodoApi.DTOs.User;
 using TodoApi.Validation;
 
 namespace TodoApi.DTOs
@@ -16,6 +17,6 @@ namespace TodoApi.DTOs
     public string Status { get; set; } = string.Empty;
 
     [Required]
-    public string AssignedUser { get; set; } = string.Empty;
+    public string AssignedUserId { get; set; } = string.Empty;
   }
 }

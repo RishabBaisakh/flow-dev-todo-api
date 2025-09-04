@@ -1,6 +1,7 @@
 using TodoApi.Models;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
+using MongoDB.Bson;
 
 namespace TodoApi.Services
 {
@@ -17,6 +18,14 @@ namespace TodoApi.Services
 
     public async Task<List<TaskItem>> GetAsync() =>
       await _tasksCollection.Find(_ => true).ToListAsync();
+
+    public async Task<TaskItem?> GetByIdAsync(string id)
+    {
+      if (!ObjectId.TryParse(id, out var objectId))
+          return null;
+
+      return await _tasksCollection.Find(t => t.Id == id).FirstOrDefaultAsync();
+    }
 
     public async Task CreateAsync(TaskItem task) =>
       await _tasksCollection.InsertOneAsync(task);
